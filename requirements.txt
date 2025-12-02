@@ -1,0 +1,20 @@
+# requirements.txt - Gabungan untuk Backend dan AI Worker
+
+# ===== BACKEND (FastAPI) =====
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+psycopg2-binary  # Untuk PostgreSQL
+python-jose[cryptography] 
+passlib[bcrypt]
+
+# ===== AI WORKER (Computer Vision & YOLO) =====
+ultralytics  # YOLO v8 untuk object detection
+opencv-python  # OpenCV untuk image processing
+numpy  # Numerical operations
+supervision  # Untuk detections dan tracking
+
+# ===== SHARED =====
+requests  # Untuk komunikasi HTTP (digunakan oleh AI Worker)
+
