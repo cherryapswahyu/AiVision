@@ -6,12 +6,10 @@ import numpy as np
 import cv2
 import supervision as sv
 from ultralytics import YOLO
+import os
 
-# --- PENGATURAN GLOBAL API ---
-# 🚨 GANTI DENGAN ALAMAT SERVER FASTAPI ANDA
-API_URL_ROOT = "http://localhost:8000/api/v1/" 
-# 🚨 GANTI DENGAN JWT ACCESS TOKEN YANG VALID UNTUK AUTENTIKASI
-ACCESS_TOKEN = "YOUR_FASTAPI_JWT_TOKEN" 
+API_URL_ROOT = os.environ.get("FASTAPI_API_URL", "http://localhost:8000/api/v1/") 
+ACCESS_TOKEN = os.environ.get("JWT_ACCESS_TOKEN", "fallback_token")
 
 # Global State: Menyimpan status antar frame (diperlukan untuk state machine)
 QUEUE_ENTRY_TIMES = {} # {tracker_id: timestamp_masuk}
