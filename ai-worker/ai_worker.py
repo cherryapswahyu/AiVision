@@ -40,19 +40,76 @@ def load_config_from_api(camera_id, branch_id):
         print(f"❌ Gagal memuat konfigurasi dari API: {e}")
         return None
 
-def send_analytics_data(camera_id, analytics_data):
-    """Mengirim hasil deteksi ke FastAPI."""
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
-    payload = {"camera": camera_id, "analytics_data": analytics_data}
+GLOBAL_ACCESS_TOKEN = "YOUR_INITIAL_TOKEN" # Akan di-overwrite
+GLOBAL_REFRESH_TOKEN = None # Akan di-overwrite
+
+# ... (Fungsi load_config_from_api dan lainnya) ...
+
+def refresh_access_token(refresh_token: str):
+    """Memanggil API refresh token dan mengupdate GLOBAL_ACCESS_TOKEN."""
+    global GLOBAL_ACCESS_TOKEN, GLOBAL_REFRESH_TOKEN
     
     try:
-        # Endpoint POST /api/v1/logs/ yang juga mentrigger heartbeat
+        # Panggil endpoint refresh token
+        response = requests.post(f"{API_URL_ROOT}auth/refresh", 
+                                 json={"username": "placeholder"}, # Ganti dengan data yang sesuai
+                                 headers={"Authorization": f"Bearer {refresh_token}"},
+                                 timeout=5)
+        response.raise_for_status()
+        
+        new_token = response.json()['access_token']
+        
+        # Update token global
+        GLOBAL_ACCESS_TOKEN = new_token
+        print("✅ Access Token berhasil diperbarui.")
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Gagal memperbarui token: {e}")
+        return False
+
+def send_analytics_data(camera_id, analytics_data):
+    """Mengirim hasil deteksi dengan mekanisme refresh token otomatis."""
+    global GLOBAL_ACCESS_TOKEN, GLOBAL_REFRESH_TOKEN
+    
+    headers = {"Authorization": f"Bearer {GLOBAL_ACCESS_TOKEN}", "Content-Type": "application/json"}
+    payload = {"camera": camera_id, "analytics_data": analytics_data}
+    
+    # 1. Coba kirim data dengan token saat ini
+    try:
         response = requests.post(f"{API_URL_ROOT}logs/", json=payload, headers=headers, timeout=5)
         response.raise_for_status()
         return True
-    except requests.exceptions.RequestException as e:
-        # Menangani error koneksi jika FastAPI down
+    except requests.exceptions.HTTPError as e:
+        # 2. Jika error 401 (Token Expired)
+        if e.response.status_code == 401 and GLOBAL_REFRESH_TOKEN:
+            print("⚠️ Token Expired. Mencoba refresh token...")
+            
+            if refresh_access_token(GLOBAL_REFRESH_TOKEN):
+                # 3. Coba kirim data lagi dengan token baru (Recursive call/Retry)
+                print("➡️ Mencoba ulang pengiriman data...")
+                # Update header dengan token baru
+                headers["Authorization"] = f"Bearer {GLOBAL_ACCESS_TOKEN}"
+                
+                try:
+                    response = requests.post(f"{API_URL_ROOT}logs/", json=payload, headers=headers, timeout=5)
+                    response.raise_for_status()
+                    return True
+                except requests.exceptions.RequestException as retry_e:
+                    print(f"❌ Gagal pengiriman ulang: {retry_e}")
+                    return False
+            else:
+                print("❌ Gagal mendapatkan token baru. Worker berhenti mengirim.")
+                return False
+        # 4. Tangani error selain 401
+        elif e.response.status_code != 401:
+            print(f"❌ Gagal mengirim data (HTTP Error {e.response.status_code})")
+            return False
         return False
+    except requests.exceptions.RequestException:
+        # Tangani kegagalan koneksi umum
+        return False
+
 
 # --- FUNGSI LOGIKA DETEKSI PERAN (STAFF vs PELANGGAN) ---
 

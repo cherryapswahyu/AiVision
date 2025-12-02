@@ -24,17 +24,19 @@ async def heartbeat_check_task():
 # --- LIFESPAN MANAGER BARU ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Start Background Task
+    # 1. Buat tabel di database saat aplikasi start
+    print("Membuat tabel-tabel di database...")
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tabel-tabel siap digunakan!")
+    
+    # 2. Start Background Task
     task = asyncio.create_task(heartbeat_check_task())
     
-    # 2. Yield (Aplikasi berjalan)
+    # 3. Yield (Aplikasi berjalan)
     yield
     
-    # 3. Shutdown (Hentikan Task saat aplikasi dimatikan)
+    # 4. Shutdown (Hentikan Task saat aplikasi dimatikan)
     task.cancel()
-
-# Buat tabel di database (dipanggil saat aplikasi pertama kali dijalankan)
-Base.metadata.create_all(bind=engine)
 
 # Ubah inisialisasi FastAPI untuk menggunakan lifespan
 app = FastAPI(

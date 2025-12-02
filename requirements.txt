@@ -5,6 +5,7 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+pydantic-settings  # Untuk BaseSettings dengan .env support
 psycopg2-binary  # Untuk PostgreSQL
 python-jose[cryptography] 
 passlib[bcrypt]

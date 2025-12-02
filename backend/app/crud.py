@@ -1,8 +1,13 @@
 # /app/crud.py
 from sqlalchemy.orm import Session
 from . import models, schemas
-from datetime import datetime
-
+from datetime import datetime, timedelta
+from sqlalchemy import or_
+from passlib.context import CryptContext
+from .core.config import settings # Asumsikan settings sudah diimpor
+import cv2 # 🚨 LIBRARY BARU UNTUK SNAPSHOT
+import time
+from typing import Optional
 # --- CRUD BRANCH (CONFIG UNTUK AI WORKER) ---
 
 def get_branch(db: Session, branch_id: int):
@@ -13,6 +18,22 @@ def get_branch(db: Session, branch_id: int):
 def get_camera(db: Session, camera_id: int):
     # Mengambil kamera berdasarkan ID
     return db.query(models.Camera).filter(models.Camera.id == camera_id).first()
+
+def update_camera(db: Session, camera_id: int, camera_update: schemas.CameraUpdate):
+    """Update konfigurasi kamera (rtsp_url dan/atau roi_settings)."""
+    db_camera = get_camera(db, camera_id)
+    if db_camera is None:
+        return None
+    
+    # Update hanya field yang diberikan
+    if camera_update.rtsp_url is not None:
+        db_camera.rtsp_url = camera_update.rtsp_url
+    if camera_update.roi_settings is not None:
+        db_camera.roi_settings = camera_update.roi_settings
+    
+    db.commit()
+    db.refresh(db_camera)
+    return db_camera
 
 # --- CRUD LOG (DARI AI WORKER) ---
 
@@ -64,3 +85,49 @@ def check_camera_heartbeats(db: Session):
     db.commit()
     print(f"[{datetime.utcnow().strftime('%H:%M:%S')}] Heartbeat Check: {count} kamera diubah menjadi OFFLINE.")
     return count
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# --- AUTHENTICATION HELPERS ---
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_user_by_username(db: Session, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
+
+# --- CAMERA SNAPSHOT LOGIC ---
+
+def get_camera_snapshot_data(db: Session, camera_id: int) -> Optional[bytes]:
+    """
+    Mengambil satu frame dari RTSP stream dan mengembalikannya sebagai byte JPEG.
+    CATATAN: Pastikan OpenCV (cv2) terinstall di backend environment (requirements.txt).
+    """
+    db_camera = get_camera(db, camera_id)
+    if not db_camera:
+        return None
+
+    # Menggunakan RTSP URL dari database
+    cap = cv2.VideoCapture(db_camera.rtsp_url)
+    
+    # Coba ambil frame 3 kali untuk stabilitas
+    for _ in range(3):
+        ret, frame = cap.read()
+        if ret:
+            break
+        time.sleep(0.1)
+        
+    cap.release()
+    
+    if ret:
+        # Resize frame ke ukuran standar (sesuai yang di-set di AI Worker)
+        resized_frame = cv2.resize(frame, (1280, 720))
+        # Encode frame menjadi JPEG
+        success, encoded_image = cv2.imencode('.jpg', resized_frame)
+        if success:
+            return encoded_image.tobytes()
+            
+    return None

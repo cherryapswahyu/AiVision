@@ -5,6 +5,7 @@
 ### **Satu Venv untuk Semua**
 
 Proyek ini menggunakan **satu virtual environment** di root project (`ProjectCCTVAi/venv/`) yang digunakan bersama oleh:
+
 - Backend FastAPI
 - AI Worker
 
@@ -60,6 +61,8 @@ pip list
 
 ## 🏃 Menjalankan Aplikasi
 
+### **Cara 1: Menggunakan Script (Paling Mudah)**
+
 ```powershell
 # Pastikan venv aktif di root project
 cd ..  # Kembali ke root
@@ -68,14 +71,34 @@ cd ..  # Kembali ke root
 # Masuk ke folder backend
 cd backend
 
+# Jalankan dengan script PowerShell
+.\run.ps1
+```
+
+Atau dengan Python:
+
+```powershell
+python run.py
+```
+
+### **Cara 2: Menggunakan Uvicorn Langsung**
+
+```powershell
+# Pastikan venv aktif dan berada di folder backend
+cd backend
+.\..\venv\Scripts\Activate.ps1  # Aktifkan venv dari root
+
 # Jalankan server
 uvicorn app.main:app --reload
 ```
+
+**PENTING:** Pastikan Anda berada di folder `backend` saat menjalankan uvicorn, bukan di root project!
 
 Aplikasi akan berjalan di: `http://localhost:8000`
 
 - API Docs: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+- Health Check: `http://localhost:8000/`
 
 ---
 
